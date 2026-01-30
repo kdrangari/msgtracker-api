@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Provider {
+  gmail
+  whatsapp
+}
+
+enum IntegrationStatus {
+  connected
+  disconnected
+  error
+}
+
+enum EventType {
+  email_sent
+  wa_sent
+  wa_status
+}
+
+model User {
+  id        String        @id @default(cuid())
+  email     String        @unique
+  name      String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  integrations Integration[]
+  events       Event[]
+}
+
+model Integration {
+  id        String            @id @default(cuid())
+  userId    String
+  provider  Provider
+  status    IntegrationStatus @default(disconnected)
+  // Provider account identifier, e.g. Gmail email address or WhatsApp phone number id
+  externalAccountId String?
+  meta      Json?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  oauth     OAuthToken?
+
+  @@unique([userId, provider])
+}
+
+model OAuthToken {
+  id            String   @id @default(cuid())
+  integrationId String   @unique
+  // refreshToken should be encrypted before storage
+  refreshToken  String
+  accessToken   String?
+  expiryTs      DateTime?
+  scopes        String
+  tokenVersion  Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  userId      String
+  provider    Provider
+  eventType   EventType
+  externalId  String
+  occurredAt  DateTime
+
+  // Common reporting fields
+  toRecipient String?
+  subject     String?
+  preview     String?
+  rawRef      Json?
+
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachments Attachment[]
+  eventLinks  EventLink[]
+
+  @@index([userId, occurredAt])
+  @@unique([provider, externalId])
+}
+
+model Link {
+  id            String   @id @default(cuid())
+  url           String
+  normalizedUrl String   @unique
+  domain        String
+  createdAt     DateTime @default(now())
+
+  eventLinks    EventLink[]
+}
+
+model EventLink {
+  id        String   @id @default(cuid())
+  eventId   String
+  linkId    String
+  createdAt DateTime @default(now())
+
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  link      Link     @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, linkId])
+}
+
+model Attachment {
+  id                  String   @id @default(cuid())
+  eventId             String
+  filename            String
+  mimeType            String
+  sizeBytes           Int?
+  externalAttachmentId String
+  createdAt           DateTime @default(now())
+
+  event               Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
