@@ -11,8 +11,12 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"
-    "engines": { "node": "20.x" }
   },
+  
+  "engines": {
+    "node": "20.x"
+  },
+  
   "dependencies": {
     "@nestjs/common": "^10.4.8",
     "@nestjs/config": "^3.2.3",
